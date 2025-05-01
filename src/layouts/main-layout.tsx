@@ -4,7 +4,7 @@ import Header from "@/components/header"
 import { Outlet } from "react-router-dom"
 
 
-const PublicLayout = () => {
+const MainLayout = () => {
     return (
        <div className="flex flex-col h-screen">
          {/* handler to store the user data (if the user is looged in or logged out like such in Firebase) */}
@@ -23,4 +23,4 @@ const PublicLayout = () => {
     )
 }
 
-export default PublicLayout
+export default MainLayout
