@@ -10,7 +10,7 @@ const MainLayout = () => {
          {/* handler to store the user data (if the user is looged in or logged out like such in Firebase) */}
          
         <Header/>
-        <Container>
+        <Container className="flex-grow">
             <main className="flex-grow">
             <Outlet/>
             </main>
