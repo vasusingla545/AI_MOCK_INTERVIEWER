@@ -50,25 +50,16 @@ export const RecordAnswer = ({
     results,
     startSpeechToText,
     stopSpeechToText,
-    error,
   } = useSpeechToText({
     continuous: true,
     useLegacyResults: false,
-    speechRecognitionProperties: {
-      lang: 'en-US',
-      interimResults: true,
-    },
   });
-
-  // Check if Speech Recognition is supported
-  const isSpeechRecognitionSupported = 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
 
   const [userAnswer, setUserAnswer] = useState("");
   const [isAiGenerating, setIsAiGenerating] = useState(false);
   const [aiResult, setAiResult] = useState<AIResponse | null>(null);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [webcamRef, setWebcamRef] = useState<WebCam | null>(null);
 
   const { userId } = useAuth();
   const { interviewId } = useParams();
@@ -145,38 +136,8 @@ export const RecordAnswer = ({
 
   const recordNewAnswer = () => {
     setUserAnswer("");
-    setAiResult(null);
     stopSpeechToText();
-    // Force clear the results by restarting speech recognition
-    setTimeout(() => {
-      startSpeechToText();
-      stopSpeechToText();
-    }, 100);
-  };
-
-  const toggleWebcam = async () => {
-    if (!isWebCam) {
-      try {
-        // Request camera permissions explicitly
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-          video: { 
-            width: 640, 
-            height: 480,
-            facingMode: "user"
-          } 
-        });
-        stream.getTracks().forEach(track => track.stop()); // Stop the test stream
-        setIsWebCam(true);
-        toast.success("Camera activated");
-      } catch (error) {
-        console.log("Camera permission error:", error);
-        toast.error("Camera Permission", {
-          description: "Please allow camera access in your browser settings"
-        });
-      }
-    } else {
-      setIsWebCam(false);
-    }
+    startSpeechToText();
   };
 
   const saveUserAnswer = async () => {
@@ -241,24 +202,8 @@ export const RecordAnswer = ({
       .map((result) => result.transcript)
       .join(" ");
 
-    // Only update if we have results and not currently recording
-    if (combineTranscripts && !isRecording && userAnswer === "") {
-      // Remove any live speech markers when setting final result
-      setUserAnswer(combineTranscripts.replace(/\[Live:.*?\]/g, '').trim());
-    }
-  }, [results, isRecording, userAnswer]);
-
-  // Update userAnswer with interimResult for real-time display
-  useEffect(() => {
-    console.log('Interim result:', interimResult, 'Recording:', isRecording);
-    if (interimResult && isRecording) {
-      setUserAnswer(prev => {
-        // Get the base answer without any interim results
-        const baseAnswer = prev.replace(/\[Live:.*?\]/g, '').trim();
-        return baseAnswer + (baseAnswer ? ' ' : '') + `[Live: ${interimResult}]`;
-      });
-    }
-  }, [interimResult, isRecording]);
+    setUserAnswer(combineTranscripts);
+  }, [results]);
 
   return (
     <div className="w-full flex flex-col items-center gap-8 mt-4">
@@ -270,51 +215,30 @@ export const RecordAnswer = ({
         loading={loading}
       />
 
-             <div className="w-full h-[400px] md:w-96 flex flex-col items-center justify-center border p-4 bg-gray-50 rounded-md">
-         {isWebCam ? (
-           <WebCam
-             ref={setWebcamRef}
-             onUserMedia={() => {
-               console.log("Webcam started successfully");
-               setIsWebCam(true);
-             }}
-             onUserMediaError={(error) => {
-               console.log("Webcam error:", error);
-               setIsWebCam(false);
-               toast.error("Webcam Error", {
-                 description: "Please check camera permissions and try again"
-               });
-             }}
-             className="w-full h-full object-cover rounded-md"
-             audio={false}
-             mirrored={true}
-             screenshotFormat="image/jpeg"
-             videoConstraints={{
-               width: 640,
-               height: 480,
-               facingMode: "user"
-             }}
-           />
-         ) : (
-           <div className="flex flex-col items-center gap-2">
-             <WebcamIcon className="min-w-24 min-h-24 text-muted-foreground" />
-             <p className="text-sm text-muted-foreground">Camera not active</p>
-           </div>
-         )}
-       </div>
+      <div className="w-full h-[400px] md:w-96 flex flex-col items-center justify-center border p-4 bg-gray-50 rounded-md">
+        {isWebCam ? (
+          <WebCam
+            onUserMedia={() => setIsWebCam(true)}
+            onUserMediaError={() => setIsWebCam(false)}
+            className="w-full h-full object-cover rounded-md"
+          />
+        ) : (
+          <WebcamIcon className="min-w-24 min-h-24 text-muted-foreground" />
+        )}
+      </div>
 
       <div className="flex itece justify-center gap-3">
-                 <TooltipButton
-           content={isWebCam ? "Turn Off" : "Turn On"}
-           icon={
-             isWebCam ? (
-               <VideoOff className="min-w-5 min-h-5" />
-             ) : (
-               <Video className="min-w-5 min-h-5" />
-             )
-           }
-           onClick={toggleWebcam}
-         />
+        <TooltipButton
+          content={isWebCam ? "Turn Off" : "Turn On"}
+          icon={
+            isWebCam ? (
+              <VideoOff className="min-w-5 min-h-5" />
+            ) : (
+              <Video className="min-w-5 min-h-5" />
+            )
+          }
+          onClick={() => setIsWebCam(!isWebCam)}
+        />
 
         <TooltipButton
           content={isRecording ? "Stop Recording" : "Start Recording"}
@@ -326,14 +250,12 @@ export const RecordAnswer = ({
             )
           }
           onClick={recordUserAnswer}
-          disbaled={!isSpeechRecognitionSupported}
         />
 
         <TooltipButton
-          content="Reset Answer"
+          content="Record Again"
           icon={<RefreshCw className="min-w-5 min-h-5" />}
           onClick={recordNewAnswer}
-          disbaled={isRecording || !userAnswer}
         />
 
         <TooltipButton
@@ -354,50 +276,13 @@ export const RecordAnswer = ({
         <h2 className="text-lg font-semibold">Your Answer:</h2>
 
         <p className="text-sm mt-2 text-gray-700 whitespace-normal">
-          {userAnswer || "Start recording to see your answer here"}
+          {userAnswer || "Start recording to see your ansewer here"}
         </p>
 
-        {isRecording && interimResult && (
-          <p className="text-sm text-blue-500 mt-2">
-            <strong>Live Speech:</strong> {interimResult}
-          </p>
-        )}
-
-        {isRecording && !interimResult && (
-          <p className="text-sm text-blue-500 mt-2">
-            <strong>Recording...</strong> Speak now to see live transcription
-          </p>
-        )}
-
-        {!isSpeechRecognitionSupported && (
-          <div className="mt-4">
-            <textarea
-              placeholder="Type your answer here (speech recognition not available in this browser)"
-              className="w-full p-2 border rounded-md"
-              value={userAnswer}
-              onChange={(e) => setUserAnswer(e.target.value)}
-              rows={4}
-            />
-          </div>
-        )}
-
-        {error && (
-          <p className="text-sm text-red-500 mt-2">
-            <strong>Error:</strong> {error}
-          </p>
-        )}
-
-        <p className="text-sm text-gray-500 mt-2">
-          <strong>Recording Status:</strong> {isRecording ? "Recording..." : "Not Recording"}
-        </p>
-        
-        <p className="text-sm text-gray-500 mt-2">
-          <strong>Results Count:</strong> {results.length}
-        </p>
-
-        {!isSpeechRecognitionSupported && (
-          <p className="text-sm text-red-500 mt-2">
-            <strong>Browser Not Supported:</strong> Speech recognition only works in Chrome, Edge, or Safari
+        {interimResult && (
+          <p className="text-sm text-gray-500 mt-2">
+            <strong>Current Speech:</strong>
+            {interimResult}
           </p>
         )}
       </div>
